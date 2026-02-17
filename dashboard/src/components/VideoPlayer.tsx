@@ -12,38 +12,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     const videoJmuxer = useRef<any>(null);
     const audioJmuxer = useRef<any>(null);
     const [isActive, setIsActive] = useState(false);
+    const [stats, setStats] = useState({ width: 0, height: 0 });
     const dataCount = useRef(0);
 
-    useEffect(() => {
+    const initMuxers = () => {
         if (!videoRef.current || !audioRef.current) return;
 
-        console.log(`[VideoPlayer] Init JMuxers for ${agentId} - ${streamType}`);
+        console.log(`[VideoPlayer] Initializing JMuxers for ${agentId}`);
 
-        // Video only JMuxer
         videoJmuxer.current = new JMuxer({
             node: videoRef.current,
             mode: 'video',
-            flushingTime: 50,
+            flushingTime: 10, // Ultra-low latency
             debug: false,
             onError: (err: any) => console.error(`[VideoJMuxer] error:`, err)
         });
 
-        // Audio only JMuxer
         audioJmuxer.current = new JMuxer({
             node: audioRef.current,
             mode: 'audio',
-            flushingTime: 50,
+            flushingTime: 10,
             debug: false,
             onError: (err: any) => console.error(`[AudioJMuxer] error:`, err)
         });
+    };
+
+    useEffect(() => {
+        initMuxers();
 
         const handleBinary = (e: any) => {
             const binaryData = e.detail;
             if (!binaryData || !videoJmuxer.current || !audioJmuxer.current) return;
 
             if (dataCount.current === 0) {
-                console.log(`[VideoPlayer] First data packet received for ${agentId}`);
                 setIsActive(true);
+                // Force play in case browser blocked it
+                videoRef.current?.play().catch(() => { });
             }
 
             dataCount.current++;
@@ -52,7 +56,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
 
             // Diagnostics for H.264
             if (typeByte === 1 || typeByte === 2) {
-                // Check for NAL unit type (byte after 00 00 00 01)
                 let nalType = -1;
                 if (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 0 && rawData[3] === 1) {
                     nalType = rawData[4] & 0x1F;
@@ -61,12 +64,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
                 }
 
                 if (nalType === 7 || nalType === 8 || nalType === 5) {
-                    console.log(`[VideoPlayer] Received Critical NAL Unit: ${nalType} (7:SPS, 8:PPS, 5:IDR) for ${agentId}`);
+                    // SPS/PPS/IDR found
+                    if (videoRef.current && videoRef.current.videoWidth > 0 && stats.width === 0) {
+                        setStats({ width: videoRef.current.videoWidth, height: videoRef.current.videoHeight });
+                    }
                 }
             }
 
-            // Feed to appropriate JMuxer
-            // 0x01: Screen, 0x02: Camera, 0x03: Audio
             if (typeByte === 1 && streamType === 'screen') {
                 videoJmuxer.current.feed({ video: rawData });
             } else if (typeByte === 2 && streamType === 'camera') {
@@ -79,7 +83,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         window.addEventListener(`agent-data-${agentId}`, handleBinary);
 
         return () => {
-            console.log(`[VideoPlayer] Cleaning up JMuxers for ${agentId}`);
             window.removeEventListener(`agent-data-${agentId}`, handleBinary);
             if (videoJmuxer.current) videoJmuxer.current.destroy();
             if (audioJmuxer.current) audioJmuxer.current.destroy();
@@ -88,8 +91,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         };
     }, [streamType, agentId]);
 
+    const resetStream = () => {
+        dataCount.current = 0;
+        setIsActive(false);
+        setStats({ width: 0, height: 0 });
+        if (videoJmuxer.current) videoJmuxer.current.destroy();
+        if (audioJmuxer.current) audioJmuxer.current.destroy();
+        initMuxers();
+    };
+
     return (
-        <div className="video-container">
+        <div className="video-container" style={{ position: 'relative' }}>
             {streamType === 'audio' ? (
                 <div className="audio-visual">
                     <div className="status-badge" style={{ background: isActive ? 'var(--success)' : '#1e1e21' }}>
@@ -102,19 +114,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
                     autoPlay
                     muted
                     playsInline
-                    style={{ background: '#000', display: 'block', width: '100%', height: '100%' }}
+                    style={{ background: '#000', width: '100%', height: '100%', objectFit: 'contain' }}
                 />
             )}
             <audio ref={audioRef} autoPlay style={{ display: 'none' }} />
 
             {!isActive && (
-                <div className="placeholder-text" style={{ position: 'absolute', zIndex: 10 }}>
-                    Waiting for {streamType} stream... ({agentId})
+                <div className="placeholder-text" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
+                    Waiting for {streamType} stream...
                 </div>
             )}
+
             {isActive && streamType !== 'audio' && (
-                <div className="status-badge" style={{ position: 'absolute', top: 10, right: 10, fontSize: '0.6rem', opacity: 0.5 }}>
-                    Receiving Data...
+                <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', gap: '0.5rem', alignItems: 'center', zIndex: 20 }}>
+                    <div className="status-badge" style={{ fontSize: '0.6rem', opacity: 0.8 }}>
+                        {stats.width > 0 ? `${stats.width}x${stats.height}` : 'Decoding...'}
+                    </div>
+                    <button
+                        onClick={resetStream}
+                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.6rem' }}
+                    >
+                        Reset
+                    </button>
+                    <div className="status-dot online" style={{ width: 8, height: 8 }}></div>
                 </div>
             )}
         </div>
