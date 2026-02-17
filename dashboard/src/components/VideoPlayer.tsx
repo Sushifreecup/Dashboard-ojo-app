@@ -23,7 +23,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         videoJmuxer.current = new JMuxer({
             node: videoRef.current,
             mode: 'video',
-            flushingTime: 10, // Ultra-low latency
+            flushingTime: streamType === 'screen' ? 100 : 10,
             debug: false,
             onError: (err: any) => console.error(`[VideoJMuxer] error:`, err)
         });
