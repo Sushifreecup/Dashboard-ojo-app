@@ -4,17 +4,16 @@ import JMuxer from 'jmuxer';
 interface VideoPlayerProps {
     streamType: 'screen' | 'camera' | 'audio';
     agentId: string;
-    binaryData: Uint8Array | null;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId, binaryData }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const jmuxerRef = useRef<any>(null);
     const [isActive, setIsActive] = useState(false);
 
     useEffect(() => {
-        if (!videoRef.current) return;
+        if (!videoRef.current && !audioRef.current) return;
 
         jmuxerRef.current = new JMuxer({
             node: streamType === 'audio' ? audioRef.current : videoRef.current,
@@ -26,16 +25,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId, binaryDa
             }
         });
 
-        return () => {
-            if (jmuxerRef.current) {
-                jmuxerRef.current.destroy();
-                jmuxerRef.current = null;
-            }
-        };
-    }, [streamType]);
+        const handleBinary = (e: any) => {
+            const binaryData = e.detail;
+            if (!binaryData || !jmuxerRef.current) return;
 
-    useEffect(() => {
-        if (binaryData && jmuxerRef.current) {
             setIsActive(true);
             const typeByte = binaryData[0];
             const rawData = binaryData.slice(1);
@@ -45,12 +38,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId, binaryDa
                 jmuxerRef.current.feed({ video: rawData });
             } else if (typeByte === 2 && streamType === 'camera') {
                 jmuxerRef.current.feed({ video: rawData });
-            } else if (typeByte === 3 && (streamType === 'audio' || streamType === 'camera' || streamType === 'screen')) {
-                // In our case we feed audio to whichever is active or a separate audio player
+            } else if (typeByte === 3) {
+                // Feed audio regardless of current view if it's audio data
                 jmuxerRef.current.feed({ audio: rawData });
             }
-        }
-    }, [binaryData, streamType]);
+        };
+
+        window.addEventListener(`agent-data-${agentId}`, handleBinary);
+
+        return () => {
+            window.removeEventListener(`agent-data-${agentId}`, handleBinary);
+            if (jmuxerRef.current) {
+                jmuxerRef.current.destroy();
+                jmuxerRef.current = null;
+            }
+        };
+    }, [streamType, agentId]);
 
     return (
         <div className="video-container">

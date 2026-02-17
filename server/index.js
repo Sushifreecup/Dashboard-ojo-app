@@ -19,11 +19,11 @@ wss.on('connection', (ws, req) => {
     if (role === 'dashboard') {
         dashboards.add(ws);
         console.log(`🖥️ Dashboard connected. Total: ${dashboards.size}`);
-        
+
         // Send initial list of agents
-        ws.send(JSON.stringify({ 
-            type: 'init', 
-            agents: Array.from(agents.keys()) 
+        ws.send(JSON.stringify({
+            type: 'init',
+            agents: Array.from(agents.keys())
         }));
 
         ws.on('message', (message) => {
@@ -47,51 +47,66 @@ wss.on('connection', (ws, req) => {
         });
 
     } else {
-        agents.set(agentId, ws);
-        console.log(`📱 Agent connected: ${agentId}`);
-        
+        let currentAgentId = agentId;
+        agents.set(currentAgentId, ws);
+        console.log(`📱 Agent connected: ${currentAgentId}`);
+
         // Notify all dashboards
-        broadcastToDashboards({ type: 'agent_online', id: agentId });
+        broadcastToDashboards({ type: 'agent_online', id: currentAgentId });
 
         ws.on('message', (message) => {
             // Forward binary data (Screen/Camera/Audio)
             if (Buffer.isBuffer(message) || message instanceof ArrayBuffer || ArrayBuffer.isView(message)) {
-                
+
                 const data = Buffer.isBuffer(message) ? message : Buffer.from(message);
-                
+
                 // We need to tell the dashboard which agent this is from.
-                // Protocol: [ID_LENGTH (1 byte)][AGENT_ID (string)][ORIGINAL_MESSAGE (binary)]
-                const agentIdBuf = Buffer.from(agentId);
+                const agentIdBuf = Buffer.from(currentAgentId);
                 const header = Buffer.alloc(1 + agentIdBuf.length);
                 header.writeUInt8(agentIdBuf.length, 0);
                 agentIdBuf.copy(header, 1);
-                
+
                 const payload = Buffer.concat([header, data]);
-                
+
                 dashboards.forEach(db => {
                     if (db.readyState === WebSocket.OPEN) {
                         db.send(payload);
                     }
                 });
             } else {
-                // Handle JSON from agent if any (e.g. telemetry updates)
+                // Handle JSON from agent
                 try {
                     const data = JSON.parse(message.toString());
-                    broadcastToDashboards({ type: 'agent_status', id: agentId, data });
-                } catch(e) {}
+                    if (data.type === 'init' && data.id) {
+                        const oldId = currentAgentId;
+                        currentAgentId = data.id;
+
+                        if (oldId !== currentAgentId) {
+                            agents.delete(oldId);
+                            agents.set(currentAgentId, ws);
+                            console.log(`📱 Agent re-identified: ${oldId} -> ${currentAgentId}`);
+
+                            // Update dashboards: remove old ID, add new ID
+                            broadcastToDashboards({ type: 'agent_offline', id: oldId });
+                            broadcastToDashboards({ type: 'agent_online', id: currentAgentId });
+                        }
+                    } else {
+                        broadcastToDashboards({ type: 'agent_status', id: currentAgentId, data });
+                    }
+                } catch (e) { }
             }
         });
 
         ws.on('close', () => {
-            agents.delete(agentId);
-            console.log(`📱 Agent disconnected: ${agentId}`);
-            broadcastToDashboards({ type: 'agent_offline', id: agentId });
+            agents.delete(currentAgentId);
+            console.log(`📱 Agent disconnected: ${currentAgentId}`);
+            broadcastToDashboards({ type: 'agent_offline', id: currentAgentId });
         });
 
         ws.on('error', (err) => {
-            console.error(`📱 Agent ${agentId} error:`, err);
-            agents.delete(agentId);
-            broadcastToDashboards({ type: 'agent_offline', id: agentId });
+            console.error(`📱 Agent ${currentAgentId} error:`, err);
+            agents.delete(currentAgentId);
+            broadcastToDashboards({ type: 'agent_offline', id: currentAgentId });
         });
     }
 });

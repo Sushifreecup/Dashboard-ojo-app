@@ -5,10 +5,9 @@ import VideoPlayer from './VideoPlayer';
 interface AgentCardProps {
     id: string;
     onSendCommand: (id: string, cmd: string) => void;
-    lastBinaryData: Uint8Array | null;
 }
 
-const AgentCard: React.FC<AgentCardProps> = ({ id, onSendCommand, lastBinaryData }) => {
+const AgentCard: React.FC<AgentCardProps> = ({ id, onSendCommand }) => {
     const [activeTab, setActiveTab] = useState<'screen' | 'camera' | 'audio'>('screen');
 
     return (
@@ -48,7 +47,6 @@ const AgentCard: React.FC<AgentCardProps> = ({ id, onSendCommand, lastBinaryData
             <VideoPlayer
                 streamType={activeTab}
                 agentId={id}
-                binaryData={lastBinaryData}
             />
 
             <div className="agent-controls">

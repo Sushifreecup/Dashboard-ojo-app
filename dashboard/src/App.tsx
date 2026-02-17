@@ -4,7 +4,6 @@ import { LayoutGrid, Radio, Smartphone } from 'lucide-react';
 
 interface AgentData {
     id: string;
-    lastBinary: Uint8Array | null;
 }
 
 const App: React.FC = () => {
@@ -31,13 +30,13 @@ const App: React.FC = () => {
                     if (data.type === 'init') {
                         const initialAgents: Record<string, AgentData> = {};
                         data.agents.forEach((id: string) => {
-                            initialAgents[id] = { id, lastBinary: null };
+                            initialAgents[id] = { id };
                         });
                         setAgents(initialAgents);
                     } else if (data.type === 'agent_online') {
                         setAgents(prev => ({
                             ...prev,
-                            [data.id]: { id: data.id, lastBinary: null }
+                            [data.id]: { id: data.id }
                         }));
                     } else if (data.type === 'agent_offline') {
                         setAgents(prev => {
@@ -51,16 +50,11 @@ const App: React.FC = () => {
                     // [ID_LENGTH (1 byte)][AGENT_ID (string)][ORIGINAL_MESSAGE (binary)]
                     const buffer = new Uint8Array(event.data);
                     const idLength = buffer[0];
-                    const agentId = new TextDecoder().decode(buffer.slice(1, 1 + idLength));
+                    const agentIdHeader = new TextDecoder().decode(buffer.slice(1, 1 + idLength));
                     const rawBinary = buffer.slice(1 + idLength);
 
-                    setAgents(prev => {
-                        if (!prev[agentId]) return prev;
-                        return {
-                            ...prev,
-                            [agentId]: { ...prev[agentId], lastBinary: rawBinary }
-                        };
-                    });
+                    // Dispatch event for the specific agent to avoid React state re-renders at 60fps
+                    window.dispatchEvent(new CustomEvent(`agent-data-${agentIdHeader}`, { detail: rawBinary }));
                 }
             };
 
@@ -118,7 +112,6 @@ const App: React.FC = () => {
                             <AgentCard
                                 key={agent.id}
                                 id={agent.id}
-                                lastBinaryData={agent.lastBinary}
                                 onSendCommand={sendCommand}
                             />
                         ))}
