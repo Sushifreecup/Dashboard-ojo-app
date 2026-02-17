@@ -14,7 +14,9 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const connect = () => {
-            const socket = new WebSocket(`ws://${window.location.hostname}:8080?role=dashboard`);
+            const wsHost = import.meta.env.VITE_WS_URL || `${window.location.hostname}:8080`;
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const socket = new WebSocket(`${protocol}://${wsHost}?role=dashboard`);
             socket.binaryType = 'arraybuffer';
 
             socket.onopen = () => {
