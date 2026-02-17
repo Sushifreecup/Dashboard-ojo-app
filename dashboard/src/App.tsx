@@ -47,13 +47,16 @@ const App: React.FC = () => {
                     }
                 } else {
                     // Binary handling
-                    // [ID_LENGTH (1 byte)][AGENT_ID (string)][ORIGINAL_MESSAGE (binary)]
                     const buffer = new Uint8Array(event.data);
                     const idLength = buffer[0];
-                    const agentIdHeader = new TextDecoder().decode(buffer.slice(1, 1 + idLength));
+                    const agentIdHeader = new TextDecoder().decode(buffer.slice(1, 1 + idLength)).trim();
                     const rawBinary = buffer.slice(1 + idLength);
 
-                    // Dispatch event for the specific agent to avoid React state re-renders at 60fps
+                    if (Math.random() < 0.01) { // Log 1% of packets to avoid flooding
+                        console.log(`[App] Recv binary from: "${agentIdHeader}" (len: ${rawBinary.length})`);
+                    }
+
+                    // Dispatch event for the specific agent
                     window.dispatchEvent(new CustomEvent(`agent-data-${agentIdHeader}`, { detail: rawBinary }));
                 }
             };
