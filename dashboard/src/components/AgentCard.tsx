@@ -53,9 +53,14 @@ const AgentCard: React.FC<AgentCardProps> = ({ id, onSendCommand }) => {
                 <button className="btn" onClick={() => onSendCommand(id, 'screen_on')}>
                     <Monitor size={16} /> Screen ON
                 </button>
-                <button className="btn" onClick={() => onSendCommand(id, 'cam_on')}>
-                    <Camera size={16} /> Cam ON
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn" style={{ flex: 1 }} onClick={() => onSendCommand(id, 'cam_back')}>
+                        <Camera size={16} /> Cam Back
+                    </button>
+                    <button className="btn" style={{ flex: 1 }} onClick={() => onSendCommand(id, 'cam_front')}>
+                        <Camera size={16} /> Cam Front
+                    </button>
+                </div>
                 <button className="btn" onClick={() => onSendCommand(id, 'mic_on')}>
                     <Mic size={16} /> Mic ON
                 </button>
