@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import JMuxer from 'jmuxer';
+import { Maximize, RefreshCw } from 'lucide-react';
 
 interface VideoPlayerProps {
     streamType: 'screen' | 'camera' | 'audio';
@@ -11,6 +12,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const videoJmuxer = useRef<any>(null);
     const audioJmuxer = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isActive, setIsActive] = useState(false);
     const [stats, setStats] = useState({ width: 0, height: 0 });
     const dataCount = useRef(0);
@@ -23,7 +25,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         videoJmuxer.current = new JMuxer({
             node: videoRef.current,
             mode: 'video',
-            flushingTime: streamType === 'screen' ? 100 : 10,
+            flushingTime: streamType === 'screen' ? 500 : 10,
             debug: false,
             onError: (err: any) => console.error(`[VideoJMuxer] error:`, err)
         });
@@ -100,8 +102,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         initMuxers();
     };
 
+    const toggleFullscreen = () => {
+        if (!containerRef.current) return;
+        if (!document.fullscreenElement) {
+            containerRef.current.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
     return (
-        <div className="video-container" style={{ position: 'relative' }}>
+        <div className="video-container" ref={containerRef} style={{ position: 'relative', background: 'black' }}>
             {streamType === 'audio' ? (
                 <div className="audio-visual">
                     <div className="status-badge" style={{ background: isActive ? 'var(--success)' : '#1e1e21' }}>
@@ -126,17 +139,28 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
             )}
 
             {isActive && streamType !== 'audio' && (
-                <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', gap: '0.5rem', alignItems: 'center', zIndex: 20 }}>
-                    <div className="status-badge" style={{ fontSize: '0.6rem', opacity: 0.8 }}>
-                        {stats.width > 0 ? `${stats.width}x${stats.height}` : 'Decoding...'}
+                <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="status-badge" style={{ fontSize: '0.6rem', opacity: 0.8 }}>
+                            {stats.width > 0 ? `${stats.width}x${stats.height}` : 'Decoding...'}
+                        </div>
+                        <button
+                            onClick={resetStream}
+                            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex' }}
+                            title="Reset Stream"
+                        >
+                            <RefreshCw size={12} />
+                        </button>
+                        <div className="status-dot online" style={{ width: 8, height: 8 }}></div>
                     </div>
+
                     <button
-                        onClick={resetStream}
-                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.6rem' }}
+                        onClick={toggleFullscreen}
+                        style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex' }}
+                        title="Fullscreen"
                     >
-                        Reset
+                        <Maximize size={14} />
                     </button>
-                    <div className="status-dot online" style={{ width: 8, height: 8 }}></div>
                 </div>
             )}
         </div>
