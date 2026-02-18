@@ -9,36 +9,47 @@ interface VideoPlayerProps {
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const jmuxer = useRef<any>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const videoMuxer = useRef<any>(null);
+    const audioMuxer = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isActive, setIsActive] = useState(false);
     const [stats, setStats] = useState({ width: 0, height: 0 });
     const dataCount = useRef(0);
 
-    const initMuxer = () => {
-        if (!videoRef.current) return;
+    const initMuxers = () => {
+        if (!videoRef.current || !audioRef.current) return;
 
-        console.log(`[VideoPlayer] Initializing JMuxer for ${agentId} (${streamType})`);
+        console.log(`[VideoPlayer] Initializing JMuxers for ${agentId} (${streamType})`);
 
-        jmuxer.current = new JMuxer({
+        videoMuxer.current = new JMuxer({
             node: videoRef.current,
-            mode: 'both', // IMPORTANTE: Permitir video y audio simultáneos
+            mode: 'video',
             flushingTime: streamType === 'screen' ? 500 : 10,
             debug: false,
-            onError: (err: any) => console.error(`[JMuxer] error:`, err)
+            onError: (err: any) => console.error(`[VideoMuxer] error:`, err)
+        });
+
+        audioMuxer.current = new JMuxer({
+            node: audioRef.current,
+            mode: 'audio',
+            flushingTime: 10,
+            debug: false,
+            onError: (err: any) => console.error(`[AudioMuxer] error:`, err)
         });
     };
 
     useEffect(() => {
-        initMuxer();
+        initMuxers();
 
         const handleBinary = (e: any) => {
             const binaryData = e.detail;
-            if (!binaryData || !jmuxer.current) return;
+            if (!binaryData || !videoMuxer.current || !audioMuxer.current) return;
 
             if (dataCount.current === 0) {
                 setIsActive(true);
                 videoRef.current?.play().catch(() => { });
+                audioRef.current?.play().catch(() => { });
             }
 
             dataCount.current++;
@@ -62,12 +73,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
             }
 
             if (typeByte === 1 && streamType === 'screen') {
-                jmuxer.current.feed({ video: rawData });
+                videoMuxer.current.feed({ video: rawData });
             } else if (typeByte === 2 && streamType === 'camera') {
-                jmuxer.current.feed({ video: rawData });
+                videoMuxer.current.feed({ video: rawData });
             } else if (typeByte === 3) {
-                // El audio se alimenta siempre si hay un muxer activo
-                jmuxer.current.feed({ audio: rawData });
+                // El audio siempre se alimenta al muxer de audio
+                audioMuxer.current.feed({ audio: rawData });
             }
         };
 
@@ -75,8 +86,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
 
         return () => {
             window.removeEventListener(`agent-data-${agentId}`, handleBinary);
-            if (jmuxer.current) jmuxer.current.destroy();
-            jmuxer.current = null;
+            if (videoMuxer.current) videoMuxer.current.destroy();
+            if (audioMuxer.current) audioMuxer.current.destroy();
+            videoMuxer.current = null;
+            audioMuxer.current = null;
         };
     }, [streamType, agentId]);
 
@@ -84,8 +97,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         dataCount.current = 0;
         setIsActive(false);
         setStats({ width: 0, height: 0 });
-        if (jmuxer.current) jmuxer.current.destroy();
-        initMuxer();
+        if (videoMuxer.current) videoMuxer.current.destroy();
+        if (audioMuxer.current) audioMuxer.current.destroy();
+        initMuxers();
     };
 
     const toggleFullscreen = () => {
@@ -104,6 +118,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
             <video
                 ref={videoRef}
                 autoPlay
+                muted
                 playsInline
                 style={{
                     background: '#000',
@@ -113,6 +128,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
                     display: streamType === 'audio' ? 'none' : 'block'
                 }}
             />
+            <audio ref={audioRef} autoPlay style={{ display: 'none' }} />
 
             {streamType === 'audio' && (
                 <div className="audio-visual" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
