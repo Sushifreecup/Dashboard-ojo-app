@@ -101,19 +101,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
 
     return (
         <div className="video-container" ref={containerRef} style={{ position: 'relative', background: 'black' }}>
-            {streamType === 'audio' ? (
-                <div className="audio-visual">
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                style={{
+                    background: '#000',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: streamType === 'audio' ? 'none' : 'block'
+                }}
+            />
+
+            {streamType === 'audio' && (
+                <div className="audio-visual" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div className="status-badge" style={{ background: isActive ? 'var(--success)' : '#1e1e21' }}>
                         {isActive ? 'Audio Streaming' : 'Audio Inactive'}
                     </div>
                 </div>
-            ) : (
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    style={{ background: '#000', width: '100%', height: '100%', objectFit: 'contain' }}
-                />
             )}
 
             {!isActive && (
