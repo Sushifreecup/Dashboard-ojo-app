@@ -113,8 +113,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
         }
     };
 
+    const handleInteraction = () => {
+        videoRef.current?.play().catch(() => { });
+        audioRef.current?.play().catch(() => { });
+        console.log('[VideoPlayer] User interaction: triggered play on video and audio');
+    };
+
     return (
-        <div className="video-container" ref={containerRef} style={{ position: 'relative', background: 'black' }}>
+        <div
+            className="video-container"
+            ref={containerRef}
+            onClick={handleInteraction}
+            style={{ position: 'relative', background: 'black', cursor: 'pointer' }}
+        >
             <video
                 ref={videoRef}
                 autoPlay
