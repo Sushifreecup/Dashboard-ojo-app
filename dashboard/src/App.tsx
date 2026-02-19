@@ -8,8 +8,14 @@ interface AgentData {
 
 const App: React.FC = () => {
     const [agents, setAgents] = useState<Record<string, AgentData>>({});
+    const agentsRef = useRef<Record<string, AgentData>>({});
     const [connected, setConnected] = useState(false);
     const ws = useRef<WebSocket | null>(null);
+
+    // Keep the ref in sync with state for use in the WS closure
+    useEffect(() => {
+        agentsRef.current = agents;
+    }, [agents]);
 
     useEffect(() => {
         const connect = () => {
@@ -54,7 +60,7 @@ const App: React.FC = () => {
 
                     // Robust matching: Find the agent ID in our state that matches the header
                     // Handle cases where one has 'agent_' prefix and the other doesn't
-                    const targetAgentId = Object.keys(agents).find(key =>
+                    const targetAgentId = Object.keys(agentsRef.current).find(key =>
                         key === agentIdHeader ||
                         key === `agent_${agentIdHeader}` ||
                         agentIdHeader === `agent_${key}`
