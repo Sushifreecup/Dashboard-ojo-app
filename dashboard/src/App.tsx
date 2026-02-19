@@ -52,16 +52,18 @@ const App: React.FC = () => {
                     const agentIdHeader = new TextDecoder().decode(buffer.slice(1, 1 + idLength)).trim();
                     const rawBinary = buffer.slice(1 + idLength);
 
-                    // Robust matching: Look for the best match in our current agent list
+                    // Robust matching: Find the agent ID in our state that matches the header
+                    // Handle cases where one has 'agent_' prefix and the other doesn't
                     const targetAgentId = Object.keys(agents).find(key =>
-                        key === agentIdHeader || key === `agent_${agentIdHeader}` || agentIdHeader === `agent_${key}`
+                        key === agentIdHeader ||
+                        key === `agent_${agentIdHeader}` ||
+                        agentIdHeader === `agent_${key}`
                     );
 
                     if (targetAgentId) {
                         window.dispatchEvent(new CustomEvent(`agent-data-${targetAgentId}`, { detail: rawBinary }));
                     } else {
-                        // Fallback logs to help debug prefix mismatches
-                        if (Math.random() < 0.05) console.warn(`[App] Binary data from untracked ID: "${agentIdHeader}". Known:`, Object.keys(agents));
+                        if (Math.random() < 0.05) console.warn(`[App] Binary from untracked ID: "${agentIdHeader}"`);
                     }
                 }
             };
