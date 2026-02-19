@@ -20,8 +20,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     const initMuxers = () => {
         if (!videoRef.current || !audioRef.current) return;
 
-        console.log(`[VideoPlayer] Initializing JMuxers for ${agentId} (${streamType})`);
+        console.log(`[VideoPlayer] Initializing JMuxers for ${agentId} | Mode: ${streamType}`);
 
+        // Video Muxer (Reset on tab switch)
         videoMuxer.current = new JMuxer({
             node: videoRef.current,
             mode: 'video',
@@ -30,6 +31,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
             onError: (err: any) => console.error(`[VideoMuxer] error:`, err)
         });
 
+        // Audio Muxer (Independent)
         audioMuxer.current = new JMuxer({
             node: audioRef.current,
             mode: 'audio',
@@ -40,31 +42,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
     };
 
     useEffect(() => {
+        // Reset state on tab switch
+        console.log(`[VideoPlayer] Tab switched to: ${streamType}. Resetting state.`);
+        setIsActive(false);
+        setStats({ width: 0, height: 0 });
+        dataCount.current = 0;
+
         initMuxers();
 
         const handleBinary = (e: any) => {
             const binaryData = e.detail;
             if (!binaryData || !videoMuxer.current || !audioMuxer.current) return;
 
-            if (dataCount.current === 0) {
-                setIsActive(true);
-                videoRef.current?.play().catch(() => { });
-                audioRef.current?.play().catch(() => { });
-            }
-
-            dataCount.current++;
             const typeByte = binaryData[0];
             const rawData = binaryData.slice(1);
 
-            // Diagnósticos de H.264 para mostrar resolución
-            if (typeByte === 1 || typeByte === 2) {
-                let nalType = -1;
-                if (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 0 && rawData[3] === 1) {
-                    nalType = rawData[4] & 0x1F;
-                } else if (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 1) {
-                    nalType = rawData[3] & 0x1F;
-                }
+            // Audio (Type 3) -> Always feed audio muxer, no matter the tab
+            if (typeByte === 3) {
+                if (dataCount.current === 0) setIsActive(true);
+                audioMuxer.current.feed({ audio: rawData });
+                audioRef.current?.play().catch(() => { });
+                return;
+            }
 
+            // Video Filtering: Only process video if it matches the current tab
+            const isActiveVideoTab = (typeByte === 1 && streamType === 'screen') || (typeByte === 2 && streamType === 'camera');
+            if (!isActiveVideoTab) return;
+
+            if (dataCount.current === 0) {
+                setIsActive(true);
+                videoRef.current?.play().catch(() => { });
+            }
+            dataCount.current++;
+
+            // Resolution detection for UI stats
+            if (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 0 && rawData[3] === 1) {
+                const nalType = rawData[4] & 0x1F;
                 if (nalType === 7 || nalType === 8 || nalType === 5) {
                     if (videoRef.current && videoRef.current.videoWidth > 0 && stats.width === 0) {
                         setStats({ width: videoRef.current.videoWidth, height: videoRef.current.videoHeight });
@@ -72,14 +85,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamType, agentId }) => {
                 }
             }
 
-            if (typeByte === 1 && streamType === 'screen') {
-                videoMuxer.current.feed({ video: rawData });
-            } else if (typeByte === 2 && streamType === 'camera') {
-                videoMuxer.current.feed({ video: rawData });
-            } else if (typeByte === 3) {
-                // El audio siempre se alimenta al muxer de audio
-                audioMuxer.current.feed({ audio: rawData });
-            }
+            videoMuxer.current.feed({ video: rawData });
         };
 
         window.addEventListener(`agent-data-${agentId}`, handleBinary);
