@@ -92,23 +92,52 @@ const AgentCard: React.FC<AgentCardProps> = ({ id, onSendCommand }) => {
                 agentId={id}
             />
 
-            <div className="agent-controls">
-                <button className="btn" style={screenOn ? onStyle : offStyle} onClick={toggleScreen}>
-                    <Monitor size={16} /> {screenOn ? '🟢 Screen ON' : '⚫ Screen OFF'}
+            <div className="agent-controls" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button
+                    className="btn"
+                    style={screenOn ? { ...onStyle, width: '100%' } : { width: '100%' }}
+                    onClick={toggleScreen}
+                >
+                    <Monitor size={18} />
+                    <div className="status-dot" style={{ background: screenOn ? '#fff' : '#4b5563', opacity: 0.6 }}></div>
+                    {screenOn ? 'Screen ON' : 'Screen OFF'}
                 </button>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="btn" style={camOn === 'back' ? { ...onStyle, flex: 1 } : { flex: 1 }} onClick={() => toggleCam('back')}>
-                        <Camera size={16} /> {camOn === 'back' ? '🟢 Cam Back' : '⚫ Cam Back'}
+
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                        className="btn"
+                        style={camOn === 'back' ? { ...onStyle, flex: 1 } : { flex: 1 }}
+                        onClick={() => toggleCam('back')}
+                    >
+                        <Camera size={16} style={{ opacity: 0.7 }} />
+                        <div className="status-dot" style={{ background: camOn === 'back' ? '#fff' : '#4b5563', opacity: 0.6 }}></div>
+                        Cam Back
                     </button>
-                    <button className="btn" style={camOn === 'front' ? { ...onStyle, flex: 1 } : { flex: 1 }} onClick={() => toggleCam('front')}>
-                        <Camera size={16} /> {camOn === 'front' ? '🟢 Cam Front' : '⚫ Cam Front'}
+                    <button
+                        className="btn"
+                        style={camOn === 'front' ? { ...onStyle, flex: 1 } : { flex: 1 }}
+                        onClick={() => toggleCam('front')}
+                    >
+                        <Camera size={16} style={{ opacity: 0.7 }} />
+                        <div className="status-dot" style={{ background: camOn === 'front' ? '#fff' : '#4b5563', opacity: 0.6 }}></div>
+                        Cam Front
                     </button>
                 </div>
-                <button className="btn" style={micOn ? onStyle : offStyle} onClick={toggleMic}>
-                    <Mic size={16} /> {micOn ? '🟢 Mic ON' : '⚫ Mic OFF'}
+
+                <button
+                    className="btn"
+                    style={micOn ? { ...onStyle, width: '100%' } : { width: '100%' }}
+                    onClick={toggleMic}
+                >
+                    <Mic size={18} />
+                    <div className="status-dot" style={{ background: micOn ? '#fff' : '#4b5563', opacity: 0.6 }}></div>
+                    {micOn ? 'Mic ON' : 'Mic OFF'}
                 </button>
-                <button className="btn danger" onClick={allOff}>
-                    <PowerOff size={16} /> ⛔ All OFF
+
+                <button className="btn" style={{ width: '100%' }} onClick={allOff}>
+                    <PowerOff size={18} style={{ opacity: 0.7 }} />
+                    <div className="status-dot" style={{ background: '#ef4444' }}></div>
+                    All OFF
                 </button>
             </div>
         </div>
